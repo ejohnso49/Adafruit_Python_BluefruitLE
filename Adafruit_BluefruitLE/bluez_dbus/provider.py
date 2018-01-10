@@ -147,7 +147,7 @@ class BluezProvider(Provider):
             # Skip devices that aren't connected.
             if not device.is_connected:
                 continue
-            device_uuids = set(map(lambda x: x.uuid, device.list_services()))
+            device_uuids = set([service.uuid for service in device.list_services()])
             if device_uuids >= service_uuids:
                 # Found a device that has at least the requested services, now
                 # disconnect from it.
@@ -155,11 +155,11 @@ class BluezProvider(Provider):
 
     def list_adapters(self):
         """Return a list of BLE adapter objects connected to the system."""
-        return map(BluezAdapter, self._get_objects('org.bluez.Adapter1'))
+        return [BluezAdapter(adapter_object) for adapter_object in self._get_objects('org.bluez.Adapter1')]
 
     def list_devices(self):
         """Return a list of BLE devices known to the system."""
-        return map(BluezDevice, self._get_objects('org.bluez.Device1'))
+        return [BluezDevice(device_object) for device_object in self._get_objects('org.bluez.Device1')]
 
     def _get_objects(self, interface, parent_path='/org/bluez'):
         """Return a list of all bluez DBus objects that implement the requested
@@ -178,7 +178,7 @@ class BluezProvider(Provider):
     def _get_objects_by_path(self, paths):
         """Return a list of all bluez DBus objects from the provided list of paths.
         """
-        return map(lambda x: self._bus.get('org.bluez', x), paths)
+        return [self._bus.get('org.bluez', path_entry) for path_entry in paths]
 
     def _print_tree(self):
         """Print tree of all bluez objects, useful for debugging."""
@@ -195,3 +195,9 @@ class BluezProvider(Provider):
                 properties = interfaces[interface]
                 for key in properties.keys():
                     print("      %s = %s" % (key, properties[key]))
+
+    def shutdown(self):
+        self._mainloop.quit()
+        while self._glib_thread.is_alive():
+            time.sleep(0.01)
+        return

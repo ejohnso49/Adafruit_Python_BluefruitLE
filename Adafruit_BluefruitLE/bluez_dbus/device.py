@@ -21,7 +21,6 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-from past.builtins import map
 import threading
 import time
 import uuid
@@ -90,7 +89,8 @@ class BluezDevice(Device):
         """Return a list of GattService objects that have been discovered for
         this device.
         """
-        return map(BluezGattService, get_provider()._get_objects(_SERVICE_INTERFACE, self.object_path))
+        return [BluezGattService(service) for service in
+                get_provider()._get_objects(_SERVICE_INTERFACE, self.object_path)]
 
     def discover(self, service_uuids, char_uuids, timeout_sec=TIMEOUT_SEC):
         """Wait up to timeout_sec for the specified services and characteristics
@@ -106,10 +106,9 @@ class BluezDevice(Device):
             # Find actual services discovered for the device.
             actual_services = set(self.advertised)
             # Find actual characteristics discovered for the device.
-            chars = map(BluezGattCharacteristic,
-                        get_provider()._get_objects(_CHARACTERISTIC_INTERFACE,
-                                                    self.object_path))
-            actual_chars = set(map(lambda x: x.uuid, chars))
+            chars = [BluezGattCharacteristic(characteristic) for characteristic in
+                     get_provider()._get_objects(_CHARACTERISTIC_INTERFACE, self.object_path)]
+            actual_chars = set([characteristic.uuid for characteristic in chars])
             # Compare actual discovered UUIDs with expected and return true if at
             # least the expected UUIDs are available.
             if actual_services >= expected_services and actual_chars >= expected_chars:

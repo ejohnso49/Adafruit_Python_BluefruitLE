@@ -21,7 +21,6 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-from past.builtins import map
 import uuid
 
 
@@ -54,8 +53,8 @@ class BluezGattService(GattService):
         service.
         """
         paths = self._gatt_service.Characteristics
-        return map(BluezGattCharacteristic,
-                   get_provider()._get_objects_by_path(paths))
+        return [BluezGattCharacteristic(characteristic) for characteristic in
+                get_provider()._get_objects_by_path(paths)]
 
 
 class BluezGattCharacteristic(GattCharacteristic):
@@ -98,7 +97,7 @@ class BluezGattCharacteristic(GattCharacteristic):
             if 'Value' not in changed_props:
                 return
             # Send the new value to the on_change callback.
-            on_change(''.join(map(chr, changed_props['Value'])))
+            on_change(''.join([chr(element) for element in changed_props['Value']]))
         # Hook up the property changed signal to call the closure above.
         self._props.PropertiesChanged.connect(characteristic_changed)
         # Enable notifications for changes on the characteristic.
@@ -113,8 +112,7 @@ class BluezGattCharacteristic(GattCharacteristic):
         characteristic.
         """
         paths = self._characteristic.Descriptors
-        return map(BluezGattDescriptor,
-                   get_provider()._get_objects_by_path(paths))
+        return [BluezGattDescriptor(descriptor) for descriptor in get_provider()._get_objects_by_path(paths)]
 
 
 class BluezGattDescriptor(GattDescriptor):
