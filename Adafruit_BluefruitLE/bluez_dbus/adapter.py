@@ -23,7 +23,7 @@
 # SOFTWARE.
 import threading
 
-import dbus
+from pydbus import SystemBus
 
 from ..config import TIMEOUT_SEC
 from ..interfaces import Adapter
@@ -39,11 +39,12 @@ class BluezAdapter(Adapter):
         """Create an instance of the bluetooth adapter from the provided bluez
         DBus object.
         """
-        self._adapter = dbus.Interface(dbus_obj, _INTERFACE)
-        self._props = dbus.Interface(dbus_obj, 'org.freedesktop.DBus.Properties')
+        self._bus = SystemBus()
+        self._adapter = dbus_obj[_INTERFACE]
+        self._props = dbus_obj['org.freedesktop.DBus.Properties']
         self._scan_started = threading.Event()
         self._scan_stopped = threading.Event()
-        self._props.connect_to_signal('PropertiesChanged', self._prop_changed)
+        self._props.PropertiesChanged.connect(self._prop_changed)
 
     def _prop_changed(self, iface, changed_props, invalidated_props):
         # Handle property changes for the adapter.  Note this call happens in
@@ -61,7 +62,7 @@ class BluezAdapter(Adapter):
     @property
     def name(self):
         """Return the name of this BLE network adapter."""
-        return self._props.Get(_INTERFACE, 'Name')
+        return self._adapter.Name
 
     def start_scan(self, timeout_sec=TIMEOUT_SEC):
         """Start scanning for BLE devices with this adapter."""
@@ -82,18 +83,19 @@ class BluezAdapter(Adapter):
         """Return True if the BLE adapter is scanning for devices, otherwise
         return False.
         """
-        return self._props.Get(_INTERFACE, 'Discovering')
+        return self._adapter.Discovering
 
     def power_on(self):
         """Power on this BLE adapter."""
-        return self._props.Set(_INTERFACE, 'Powered', True)
+        self._adapter.Powered = True
+        return
 
     def power_off(self):
         """Power off this BLE adapter."""
-        return self._props.Set(_INTERFACE, 'Powered', False)
+        self._adapter.Powered = False
 
     @property
     def is_powered(self):
         """Return True if the BLE adapter is powered up, otherwise return False.
         """
-        return self._props.Get(_INTERFACE, 'Powered')
+        return self._adapter.Powered
