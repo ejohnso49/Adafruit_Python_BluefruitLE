@@ -26,7 +26,6 @@ import time
 import uuid
 
 from pydbus import SystemBus
-import dbus
 
 from ..config import TIMEOUT_SEC
 from ..interfaces import Device
