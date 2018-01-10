@@ -26,11 +26,10 @@ import sys
 import threading
 import time
 
-import dbus
-import dbus.mainloop.glib
+from pydbus import SystemBus
 from future.utils import raise_
 from future.utils import iteritems
-from gi.repository import GObject
+from gi.repository import GLib
 
 from ..interfaces import Provider
 
@@ -38,6 +37,7 @@ from .adapter import BluezAdapter
 from .adapter import _INTERFACE as _ADAPTER_INTERFACE
 from .device import BluezDevice
 
+_BLUEZ_ROOT = 'org.bluez'
 
 class BluezProvider(Provider):
     """BLE provider implementation using the bluez DBus interface and GTK main
@@ -59,17 +59,11 @@ class BluezProvider(Provider):
         """Initialize bluez DBus communication.  Must be called before any other
         calls are made!
         """
-        # Ensure GLib's threading is initialized to support python threads, and
-        # make a default mainloop that all DBus objects will inherit.  These
-        # commands MUST execute before any other DBus commands!
-        GObject.threads_init()
-        dbus.mainloop.glib.threads_init()
         # Set the default main loop, this also MUST happen before other DBus calls.
-        self._mainloop = dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+        self._mainloop = GLib.MainLoop()
         # Get the main DBus system bus and root bluez object.
-        self._bus = dbus.SystemBus()
-        self._bluez = dbus.Interface(self._bus.get_object('org.bluez', '/'),
-                                     'org.freedesktop.DBus.ObjectManager')
+        self._bus = SystemBus()
+        self._bluez = self._bus.get(_BLUEZ_ROOT, '/')['org.freedesktop.DBus.ObjectManager']
 
     def run_mainloop_with(self, target):
         """Start the OS's main loop to process asyncronous BLE events and then
@@ -90,12 +84,11 @@ class BluezProvider(Provider):
         self._user_thread = threading.Thread(target=self._user_thread_main, args=(target,))
         self._user_thread.daemon = True  # Don't let the user thread block exit.
         self._user_thread.start()
-        # Spin up a GLib main loop in the main thread to process async BLE events.
-        self._gobject_mainloop = GObject.MainLoop()
+        # Use existing GLib MainLoop to handle asynchronous events.
         try:
-            self._gobject_mainloop.run()  # Doesn't return until the mainloop ends.
+            self._mainloop.run()  # Doesn't return until the mainloop ends.
         except KeyboardInterrupt:
-            self._gobject_mainloop.quit()
+            self._mainloop.quit()
             sys.exit(0)
         # Main loop finished.  Check if an exception occured and throw it,
         # otherwise return the status code from the user code.
@@ -111,7 +104,7 @@ class BluezProvider(Provider):
         try:
             # Wait for GLib main loop to start running before starting user code.
             while True:
-                if self._gobject_mainloop is not None and self._gobject_mainloop.is_running():
+                if self._mainloop is not None and self._mainloop.is_running():
                     # Main loop is running, we should be ready to make bluez DBus calls.
                     break
                 # Main loop isn't running yet, give time back to other threads.
@@ -122,12 +115,12 @@ class BluezProvider(Provider):
             if self._return_code is None:
                 self._return_code = 0
             # Signal the main loop to exit.
-            self._gobject_mainloop.quit()
+            self._mainloop.quit()
         except Exception as ex:
             # Something went wrong.  Raise the exception on the main thread to
             # exit.
             self._exception = sys.exc_info()
-            self._gobject_mainloop.quit()
+            self._mainloop.quit()
 
     def clear_cached_data(self):
         """Clear any internally cached BLE device data.  Necessary in some cases
@@ -139,11 +132,10 @@ class BluezProvider(Provider):
             if device.is_connected:
                 continue
             # Remove this device.  First get the adapter associated with the device.
-            adapter = dbus.Interface(self._bus.get_object('org.bluez', device._adapter),
-                                     _ADAPTER_INTERFACE)
+            adapter = self._bus.get(_BLUEZ_ROOT, device._adapter)[_ADAPTER_INTERFACE]
             # Now call RemoveDevice on the adapter to remove the device from
             # bluez's DBus hierarchy.
-            adapter.RemoveDevice(device._device.object_path)
+            adapter.RemoveDevice(device.object_path)
 
     def disconnect_devices(self, service_uuids=[]):
         """Disconnect any connected devices that have the specified list of
@@ -180,13 +172,13 @@ class BluezProvider(Provider):
         objects = []
         for opath, interfaces in iteritems(self._bluez.GetManagedObjects()):
             if interface in interfaces.keys() and opath.lower().startswith(parent_path):
-                objects.append(self._bus.get_object('org.bluez', opath))
+                objects.append(self._bus.get(_BLUEZ_ROOT, opath))
         return objects
 
     def _get_objects_by_path(self, paths):
         """Return a list of all bluez DBus objects from the provided list of paths.
         """
-        return map(lambda x: self._bus.get_object('org.bluez', x), paths)
+        return map(lambda x: self._bus.get('org.bluez', x), paths)
 
     def _print_tree(self):
         """Print tree of all bluez objects, useful for debugging."""
