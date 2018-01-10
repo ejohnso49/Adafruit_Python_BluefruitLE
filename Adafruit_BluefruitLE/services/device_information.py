@@ -69,53 +69,53 @@ class DeviceInformation(ServiceBase):
     @property
     def manufacturer(self):
         if self._manufacturer is not None:
-            return self._manufacturer.read_value()
+            return ''.join([chr(x) for x in self._manufacturer.read_value()])
         return None
 
     @property
     def model(self):
         if self._model is not None:
-            return self._model.read_value()
+            return ''.join([chr(x) for x in self._model.read_value()])
         return None
 
     @property
     def serial(self):
         if self._serial is not None:
-            return self._serial.read_value()
+            return ''.join([chr(x) for x in self._serial.read_value()])
         return None
 
     @property
     def hw_revision(self):
         if self._hw_revision is not None:
-            return self._hw_revision.read_value()
+            return ''.join([chr(x) for x in self._hw_revision.read_value()])
         return None
 
     @property
     def sw_revision(self):
         if self._sw_revision is not None:
-            return self._sw_revision.read_value()
+            return ''.join([chr(x) for x in self._sw_revision.read_value()])
         return None
 
     @property
     def fw_revision(self):
         if self._fw_revision is not None:
-            return self._fw_revision.read_value()
+            return ''.join([chr(x) for x in self._fw_revision.read_value()])
         return None
 
     @property
     def system_id(self):
         if self._sys_id is not None:
-            return self._sys_id.read_value()
+            return ''.join([chr(x) for x in self._sys_id.read_value()])
         return None
 
     @property
     def regulatory_cert(self):
         if self._reg_cert is not None:
-            return self._reg_cert.read_value()
+            return ''.join([chr(x) for x in self._reg_cert.read_value()])
         return None
 
     @property
     def pnp_id(self):
         if self._pnp_id is not None:
-            return self._pnp_id.read_value()
+            return ''.join([chr(x) for x in self._pnp_id.read_value()])
         return None
