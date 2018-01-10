@@ -26,6 +26,7 @@ import threading
 import time
 import uuid
 
+from pydbus import SystemBus
 import dbus
 
 from ..config import TIMEOUT_SEC
@@ -46,11 +47,13 @@ class BluezDevice(Device):
         """Create an instance of the bluetooth device from the provided bluez
         DBus object.
         """
-        self._device = dbus.Interface(dbus_obj, _INTERFACE)
-        self._props = dbus.Interface(dbus_obj, 'org.freedesktop.DBus.Properties')
+        self._bus = SystemBus()
+        self.object_path = dbus_obj._path
+        self._device = dbus_obj[_INTERFACE]
+        self._props = dbus_obj['org.freedesktop.DBus.Properties']
         self._connected = threading.Event()
         self._disconnected = threading.Event()
-        self._props.connect_to_signal('PropertiesChanged', self._prop_changed)
+        self._props.PropertiesChanged.connect(self._prop_changed)
 
     def _prop_changed(self, iface, changed_props, invalidated_props):
         # Handle property changes for the device.  Note this call happens in
@@ -87,9 +90,7 @@ class BluezDevice(Device):
         """Return a list of GattService objects that have been discovered for
         this device.
         """
-        return map(BluezGattService,
-                   get_provider()._get_objects(_SERVICE_INTERFACE,
-                                               self._device.object_path))
+        return map(BluezGattService, get_provider()._get_objects(_SERVICE_INTERFACE, self.object_path))
 
     def discover(self, service_uuids, char_uuids, timeout_sec=TIMEOUT_SEC):
         """Wait up to timeout_sec for the specified services and characteristics
@@ -107,7 +108,7 @@ class BluezDevice(Device):
             # Find actual characteristics discovered for the device.
             chars = map(BluezGattCharacteristic,
                         get_provider()._get_objects(_CHARACTERISTIC_INTERFACE,
-                                                    self._device.object_path))
+                                                    self.object_path))
             actual_chars = set(map(lambda x: x.uuid, chars))
             # Compare actual discovered UUIDs with expected and return true if at
             # least the expected UUIDs are available.
@@ -128,12 +129,11 @@ class BluezDevice(Device):
         # Get UUIDs property but wrap it in a try/except to catch if the property
         # doesn't exist as it is optional.
         try:
-            uuids = self._props.Get(_INTERFACE, 'UUIDs')
-        except dbus.exceptions.DBusException as ex:
+            uuids = self._device.UUIDs
+        except Exception as ex:
             # Ignore error if device has no UUIDs property (i.e. might not be
             # a BLE device).
-            if ex.get_dbus_name() != 'org.freedesktop.DBus.Error.InvalidArgs':
-                raise ex
+            raise ex
         return [uuid.UUID(str(x)) for x in uuids]
 
     @property
@@ -142,25 +142,26 @@ class BluezDevice(Device):
         this will be the MAC address of the device, however on unsupported
         platforms (Mac OSX) it will be a unique ID like a UUID.
         """
-        return self._props.Get(_INTERFACE, 'Address')
+        return self._device.Address
 
     @property
     def name(self):
         """Return the name of this device."""
-        return self._props.Get(_INTERFACE, 'Name')
+        return self._device.Name
 
     @property
     def is_connected(self):
         """Return True if the device is connected to the system, otherwise False.
         """
-        return self._props.Get(_INTERFACE, 'Connected')
+        return self._device.Connected
 
     @property
     def rssi(self):
         """Return the RSSI signal strength in decibels."""
-        return self._props.Get(_INTERFACE, 'RSSI')
+        return self._device.RSSI
 
+    # TODO refactor to _adapter_path?
     @property
     def _adapter(self):
         """Return the DBus path to the adapter that owns this device."""
-        return self._props.Get(_INTERFACE, 'Adapter')
+        return self._device.Adapter
