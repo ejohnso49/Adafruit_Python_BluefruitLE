@@ -24,7 +24,6 @@
 from past.builtins import map
 import uuid
 
-import dbus
 
 from ..interfaces import GattService, GattCharacteristic, GattDescriptor
 from ..platform import get_provider
@@ -42,18 +41,19 @@ class BluezGattService(GattService):
         """Create an instance of the GATT service from the provided bluez
         DBus object.
         """
-        self._props = dbus.Interface(dbus_obj, 'org.freedesktop.DBus.Properties')
+        self._gatt_service = dbus_obj['org.bluez.GattService1']
+        self._props = dbus_obj['org.freedesktop.DBus.Properties']
 
     @property
     def uuid(self):
         """Return the UUID of this GATT service."""
-        return uuid.UUID(str(self._props.Get(_SERVICE_INTERFACE, 'UUID')))
+        return uuid.UUID(self._gatt_service.UUID)
 
     def list_characteristics(self):
         """Return list of GATT characteristics that have been discovered for this
         service.
         """
-        paths = self._props.Get(_SERVICE_INTERFACE, 'Characteristics')
+        paths = self._gatt_service.Characteristics
         return map(BluezGattCharacteristic,
                    get_provider()._get_objects_by_path(paths))
 
@@ -65,13 +65,13 @@ class BluezGattCharacteristic(GattCharacteristic):
         """Create an instance of the GATT characteristic from the provided bluez
         DBus object.
         """
-        self._characteristic = dbus.Interface(dbus_obj, _CHARACTERISTIC_INTERFACE)
-        self._props = dbus.Interface(dbus_obj, 'org.freedesktop.DBus.Properties')
+        self._characteristic = dbus_obj['org.bluez.GattCharacteristic1']
+        self._props = dbus_obj['org.freedesktop.DBus.Properties']
 
     @property
     def uuid(self):
         """Return the UUID of this GATT characteristic."""
-        return uuid.UUID(str(self._props.Get(_CHARACTERISTIC_INTERFACE, 'UUID')))
+        return uuid.UUID(self._characteristic.UUID)
 
     def read_value(self):
         """Read the value of this characteristic."""
@@ -79,7 +79,7 @@ class BluezGattCharacteristic(GattCharacteristic):
 
     def write_value(self, value):
         """Write the specified value to this characteristic."""
-        self._characteristic.WriteValue(value)
+        self._characteristic.WriteValue(value.encode())
 
     def start_notify(self, on_change):
         """Enable notification of changes for this characteristic on the
@@ -100,7 +100,7 @@ class BluezGattCharacteristic(GattCharacteristic):
             # Send the new value to the on_change callback.
             on_change(''.join(map(chr, changed_props['Value'])))
         # Hook up the property changed signal to call the closure above.
-        self._props.connect_to_signal('PropertiesChanged', characteristic_changed)
+        self._props.PropertiesChanged.connect(characteristic_changed)
         # Enable notifications for changes on the characteristic.
         self._characteristic.StartNotify()
 
@@ -112,7 +112,7 @@ class BluezGattCharacteristic(GattCharacteristic):
         """Return list of GATT descriptors that have been discovered for this
         characteristic.
         """
-        paths = self._props.Get(_CHARACTERISTIC_INTERFACE, 'Descriptors')
+        paths = self._characteristic.Descriptors
         return map(BluezGattDescriptor,
                    get_provider()._get_objects_by_path(paths))
 
@@ -124,13 +124,13 @@ class BluezGattDescriptor(GattDescriptor):
         """Create an instance of the GATT descriptor from the provided bluez
         DBus object.
         """
-        self._descriptor = dbus.Interface(dbus_obj, _DESCRIPTOR_INTERFACE)
-        self._props = dbus.Interface(dbus_obj, 'org.freedesktop.DBus.Properties')
+        self._descriptor = dbus_obj['org.bluez.GattDescriptor1']
+        self._props = dbus_obj['org.freedesktop.DBus.Properties']
 
     @property
     def uuid(self):
         """Return the UUID of this GATT descriptor."""
-        return uuid.UUID(str(self._props.Get(_DESCRIPTOR_INTERFACE, 'UUID')))
+        return uuid.UUID(self._descriptor.UUID)
 
     def read_value(self):
         """Read the value of this descriptor."""
